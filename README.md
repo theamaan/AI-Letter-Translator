@@ -78,33 +78,3 @@ Run tests with `pytest`:
 ```bash
 pytest -q
 ```
-
-## What to include on GitHub
-
-Include the following files/folders in the GitHub repository:
-
-- [translator.py](translator.py)
-- [config.py](config.py)
-- [requirements.txt](requirements.txt)
-- [inspect_compact.py](inspect_compact.py)
-- [inspect_doc.py](inspect_doc.py)
-- [verify_images.py](verify_images.py)
-- `test_*.py` files (unit/integration tests)
-- `README.md` (this file)
-
-Exclude the following (see `.gitignore`):
-
-- `Translated Files/` (generated outputs)
-- `.env` (API keys and secrets)
-- `__pycache__/`, `.venv/`, `*.pyc`
-
-## Security / Privacy
-
-- Never commit API keys or `.env` files. Use CI secrets or repository secrets for deployment.
-- Be careful with private data in source documents before uploading to remote services.
-
-## Next steps (suggested)
-
-- Verify `requirements.txt` lists only needed packages.
-- Optionally create a minimal `pyproject.toml` for packaging.
-- Ask me to prepare a commit and push to GitHub, or to add a GitHub Actions workflow to run tests.
