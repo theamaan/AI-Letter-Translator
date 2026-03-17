@@ -50,7 +50,7 @@ def call_llm(client: Cerebras, system_prompt: str, user_prompt: str) -> str:
                     {"role": "user", "content": user_prompt},
                 ],
                 stream=True,
-                max_completion_tokens=4096,
+                max_completion_tokens=20000,
                 temperature=0.1,  # Low temp for consistent, accurate translations
                 top_p=1,
             )

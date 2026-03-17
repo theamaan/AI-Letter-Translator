@@ -18,7 +18,7 @@ OUTPUT_FOLDER = (
  
 # ─── Cerebras API ────────────────────────────────────────────────────────────
 CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY", "")
-CEREBRAS_MODEL = "gpt-oss-120b"
+CEREBRAS_MODEL = "qwen-3-235b-a22b-instruct-2507"
  
 # ─── Translation settings ───────────────────────────────────────────────────
 # Max retries for API calls
@@ -46,4 +46,5 @@ LANGUAGE_MAP = {
     "so": "Somali",
     "hmn": "Hmong",
     "en": "English",
+    "te": "Telugu",
 }

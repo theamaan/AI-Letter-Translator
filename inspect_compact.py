@@ -4,7 +4,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 import os
  
 path = r'C:\Users\theam\Downloads\medical-certificate-template-09'
-filename = 'medical certificate template_es.docx'
+filename = '453-medical-professional-blue-portrait_es.docx'
 doc = Document(os.path.join(path, filename))
  
 print(f'=== DOCUMENT: {filename} ===')
