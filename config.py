@@ -69,3 +69,16 @@ LANGUAGE_MAP = {
     "en": "English",
     "te": "Telugu",
 }
+
+# ─── Spanish readability adaptation ───────────────────────────────────────────
+# When translating Spanish documents, the translator can adapt readability toward
+# a requested school-grade target using the Fernandez-Huerta index.
+SPANISH_READABILITY_ENABLED = (
+    os.getenv("SPANISH_READABILITY_ENABLED", "true").lower() == "true"
+)
+# Used when no --spanish-grade value is passed at runtime.
+SPANISH_DEFAULT_TARGET_GRADE = os.getenv("SPANISH_DEFAULT_TARGET_GRADE", "normal")
+# Safety cap: number of rewrite attempts for each Spanish text fragment.
+SPANISH_MAX_ADAPT_PASSES = int(os.getenv("SPANISH_MAX_ADAPT_PASSES", "3"))
+# Skip adaptation for very short fragments where readability metrics are noisy.
+SPANISH_MIN_WORDS_FOR_ADAPT = int(os.getenv("SPANISH_MIN_WORDS_FOR_ADAPT", "12"))

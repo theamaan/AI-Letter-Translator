@@ -41,6 +41,12 @@ from docx.shared import Pt, Emu, RGBColor
 
 import config
 from routing import TranslationRouter
+from spanish_readability import (
+    SpanishReadabilityTracker,
+    SpanishTargetBand,
+    adapt_spanish_text_to_grade,
+    normalize_target_grade,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -460,6 +466,70 @@ def _call_batch(
     return _parse_batch_response(result, len(batch), originals)
 
 
+def _cache_key(
+    text: str,
+    target_language: str,
+    spanish_target: Optional[SpanishTargetBand],
+) -> tuple:
+    """Build a cache key that separates Spanish adaptations by target band."""
+    base = (text.strip(), target_language)
+    if target_language.strip().lower() != "spanish" or not spanish_target:
+        return base
+    return base + (f"spanish-target:{spanish_target.label}",)
+
+
+def _maybe_adapt_spanish_text(
+    translated_text: str,
+    target_language: str,
+    do_not_translate: list,
+    router: TranslationRouter,
+    spanish_target: Optional[SpanishTargetBand],
+    spanish_tracker: Optional[SpanishReadabilityTracker],
+) -> str:
+    """Adapt translated text only for Spanish documents when enabled."""
+    if not config.SPANISH_READABILITY_ENABLED:
+        return translated_text
+    if target_language.strip().lower() != "spanish" or not spanish_target:
+        return translated_text
+    if not translated_text or not translated_text.strip():
+        return translated_text
+
+    result = adapt_spanish_text_to_grade(
+        text=translated_text,
+        target=spanish_target,
+        router=router,
+        do_not_translate=do_not_translate,
+        max_attempts=config.SPANISH_MAX_ADAPT_PASSES,
+        min_words_for_adapt=config.SPANISH_MIN_WORDS_FOR_ADAPT,
+    )
+    if spanish_tracker:
+        spanish_tracker.record(result)
+    return result.text
+
+
+def _print_spanish_readability_summary(summary: Optional[dict]) -> None:
+    """Print aggregated Spanish readability/adaptation metrics."""
+    if not summary:
+        return
+
+    ind = "  "
+    print(f"{ind}Spanish readability target : {summary['target_label']}")
+    print(
+        f"{ind}Target score range        : {summary['target_range']} "
+        f"({summary['target_estimated_grade']})"
+    )
+    print(f"{ind}Fragments processed       : {summary['fragments']}")
+    print(f"{ind}Fragments adapted        : {summary['adapted_fragments']}")
+    print(f"{ind}Adaptation attempts      : {summary['attempts_total']}")
+    print(f"{ind}Avg score before adapt   : {summary['avg_before_score']}")
+    print(f"{ind}Avg score after adapt    : {summary['avg_after_score']}")
+    print(
+        f"{ind}Avg interpreted level    : {summary['avg_after_band']} "
+        f"({summary['avg_after_estimated_grade']})"
+    )
+    print(f"{ind}Target hit on average    : {summary['target_reached_on_average']}")
+
+
 # ---------------------------------------------------------------------------
 # Section-Level Translation
 # ---------------------------------------------------------------------------
@@ -471,6 +541,8 @@ def _translate_section(
     router: TranslationRouter,
     cache: dict,
     stats: _TranslationStats,
+    spanish_target: Optional[SpanishTargetBand] = None,
+    spanish_tracker: Optional[SpanishReadabilityTracker] = None,
 ) -> None:
     """
     Translate a list of paragraphs (body / table cell / header / footer).
@@ -498,7 +570,7 @@ def _translate_section(
     pending_long: list = []
 
     for i, para, text in translatable:
-        key = (text.strip(), target_language)
+        key = _cache_key(text, target_language, spanish_target)
         if key in cache:
             result_map[i] = cache[key]
             stats.cache_hits += 1
@@ -511,15 +583,31 @@ def _translate_section(
         batch = pending_short[start : start + config.BATCH_SIZE]
         results = _call_batch(batch, target_language, do_not_translate, router, stats)
         for (i, para, text), translated in zip(batch, results):
+            translated = _maybe_adapt_spanish_text(
+                translated,
+                target_language,
+                do_not_translate,
+                router,
+                spanish_target,
+                spanish_tracker,
+            )
             result_map[i] = translated
-            cache[(text.strip(), target_language)] = translated
+            cache[_cache_key(text, target_language, spanish_target)] = translated
 
     for i, para, text in pending_long:
         sys_prompt = _build_translation_prompt(target_language, do_not_translate, text)
         result, label = router.call_with_fallback("translate", sys_prompt, text)
         translated = result if result else text
+        translated = _maybe_adapt_spanish_text(
+            translated,
+            target_language,
+            do_not_translate,
+            router,
+            spanish_target,
+            spanish_tracker,
+        )
         result_map[i] = translated
-        cache[(text.strip(), target_language)] = translated
+        cache[_cache_key(text, target_language, spanish_target)] = translated
         stats.record(label)
 
     for i, para, _text in translatable:
@@ -569,6 +657,7 @@ def translate_document(
     output_path: str,
     target_language: str,
     router: TranslationRouter,
+    spanish_grade_target: Optional[str] = None,
 ) -> None:
     """
     Main translation pipeline:
@@ -588,6 +677,14 @@ def translate_document(
     doc = Document(source_path)
     full_text = _extract_full_document_text(doc)
 
+    spanish_target: Optional[SpanishTargetBand] = None
+    spanish_tracker: Optional[SpanishReadabilityTracker] = None
+    if target_language.strip().lower() == "spanish" and config.SPANISH_READABILITY_ENABLED:
+        requested_target = spanish_grade_target or config.SPANISH_DEFAULT_TARGET_GRADE
+        spanish_target = normalize_target_grade(requested_target)
+        spanish_tracker = SpanishReadabilityTracker(spanish_target)
+        print(f"  Spanish target readability: {spanish_target.label} ({requested_target})")
+
     do_not_translate, analysis_provider = analyze_document_content(router, full_text)
 
     stats = _TranslationStats()
@@ -595,7 +692,8 @@ def translate_document(
 
     print(f"\n  [Agent Step 2] Translating {len(doc.paragraphs)} paragraphs...")
     _translate_section(
-        list(doc.paragraphs), target_language, do_not_translate, router, cache, stats
+        list(doc.paragraphs), target_language, do_not_translate, router, cache, stats,
+        spanish_target=spanish_target, spanish_tracker=spanish_tracker,
     )
 
     print(f"  Translating {len(doc.tables)} table(s)...")
@@ -605,6 +703,7 @@ def translate_document(
                 _translate_section(
                     list(cell.paragraphs), target_language,
                     do_not_translate, router, cache, stats,
+                    spanish_target=spanish_target, spanish_tracker=spanish_tracker,
                 )
 
     print("  Translating headers and footers...")
@@ -614,6 +713,7 @@ def translate_document(
                 _translate_section(
                     list(hf.paragraphs), target_language,
                     do_not_translate, router, cache, stats,
+                    spanish_target=spanish_target, spanish_tracker=spanish_tracker,
                 )
 
     output_dir = os.path.dirname(output_path)
@@ -622,6 +722,8 @@ def translate_document(
     doc.save(output_path)
 
     _print_document_stats(stats, source_path, output_path, analysis_provider)
+    if spanish_tracker:
+        _print_spanish_readability_summary(spanish_tracker.summary())
     print(f"{'=' * 70}\n")
 
 
@@ -703,6 +805,15 @@ def main():
             "'cerebras-only': Cerebras for everything (original behaviour)."
         ),
     )
+    parser.add_argument(
+        "--spanish-grade",
+        type=str,
+        default=None,
+        help=(
+            "Requested Spanish readability target. Accepts numeric grade "
+            "(e.g., 6, 8, 10) or band (very easy, easy, normal, difficult)."
+        ),
+    )
     args = parser.parse_args()
 
     if not os.path.exists(config.SOURCE_FOLDER):
@@ -752,7 +863,13 @@ def main():
         target_language = get_language_name(lang_code)
 
         try:
-            translate_document(source_path, output_path, target_language, router)
+            translate_document(
+                source_path,
+                output_path,
+                target_language,
+                router,
+                spanish_grade_target=args.spanish_grade,
+            )
             success_count += 1
         except Exception as exc:
             print(f"  ERROR translating {filename}: {exc}")
