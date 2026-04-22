@@ -31,6 +31,21 @@ class SpanishReadabilityTests(unittest.TestCase):
         self.assertEqual(target.label, "very-easy")
         self.assertEqual(target.estimated_grade, "Grade 5 or lower")
 
+    def test_normalize_target_grade_moderate_band(self):
+        target = normalize_target_grade("moderate")
+        self.assertEqual(target.label, "moderate")
+        self.assertEqual(target.min_score, 50.0)
+        self.assertEqual(target.max_score, 59.99)
+        self.assertEqual(target.estimated_grade, "Grade 10-12")
+
+    def test_normalize_target_grade_numeric_10(self):
+        target = normalize_target_grade(10)
+        self.assertEqual(target.label, "moderate")
+
+    def test_normalize_target_grade_numeric_12(self):
+        target = normalize_target_grade(12)
+        self.assertEqual(target.label, "moderate")
+
     def test_fernandez_huerta_scores_simpler_text_higher(self):
         simple = "Este texto es simple. Tiene frases cortas. Es facil de leer."
         complex_text = (

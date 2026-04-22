@@ -811,7 +811,7 @@ def main():
         default=None,
         help=(
             "Requested Spanish readability target. Accepts numeric grade "
-            "(e.g., 6, 8, 10) or band (very easy, easy, normal, difficult)."
+            "(e.g., 6, 8, 10) or band (very easy, easy, normal, moderate, difficult)."
         ),
     )
     args = parser.parse_args()

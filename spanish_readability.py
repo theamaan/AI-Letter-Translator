@@ -100,7 +100,7 @@ def normalize_target_grade(target: Any) -> SpanishTargetBand:
     Accepted forms:
       - Numeric grade: 5, 7, 9, 11
       - Numeric string: "6", "8"
-      - Named band: "very easy", "easy", "normal", "difficult"
+            - Named band: "very easy", "easy", "normal", "moderate", "difficult"
     """
     if target is None:
         raise ValueError("Spanish target grade is required for normalization.")
@@ -123,6 +123,8 @@ def normalize_target_grade(target: Any) -> SpanishTargetBand:
             "easy": "easy",
             "normal": "normal",
             "standard": "normal",
+            "moderate": "moderate",
+            "medium": "moderate",
             "difficult": "difficult",
             "hard": "difficult",
             "grade 5": "very-easy",
@@ -130,6 +132,9 @@ def normalize_target_grade(target: Any) -> SpanishTargetBand:
             "grade 7": "easy",
             "grade 8": "normal",
             "grade 9": "normal",
+            "grade 10": "moderate",
+            "grade 11": "moderate",
+            "grade 12": "moderate",
         }
         norm = aliases.get(raw, raw.replace("_", "-").replace(" ", "-"))
 
@@ -139,12 +144,14 @@ def normalize_target_grade(target: Any) -> SpanishTargetBand:
             return SpanishTargetBand("easy", 80.0, 89.99, "Grade 6-7")
         if norm == "normal":
             return SpanishTargetBand("normal", 60.0, 79.99, "Grade 8-9")
+        if norm == "moderate":
+            return SpanishTargetBand("moderate", 50.0, 59.99, "Grade 10-12")
         if norm == "difficult":
             return SpanishTargetBand("difficult", 0.0, 49.99, "High school/college+")
 
     raise ValueError(
         "Unsupported Spanish target grade. Use numeric grades (e.g., 6, 8) "
-        "or bands: very easy, easy, normal, difficult."
+        "or bands: very easy, easy, normal, moderate, difficult."
     )
 
 
@@ -245,7 +252,7 @@ def score_to_band(score: float) -> str:
     if score >= 60:
         return "normal"
     if score >= 50:
-        return "moderate-difficulty"
+        return "moderate"
     return "difficult"
 
 
@@ -307,6 +314,8 @@ def _band_from_numeric_grade(grade: float) -> SpanishTargetBand:
         return SpanishTargetBand("easy", 80.0, 89.99, "Grade 6-7")
     if grade <= 9:
         return SpanishTargetBand("normal", 60.0, 79.99, "Grade 8-9")
+    if grade <= 12:
+        return SpanishTargetBand("moderate", 50.0, 59.99, "Grade 10-12")
     return SpanishTargetBand("difficult", 0.0, 49.99, "High school/college+")
 
 
