@@ -16,9 +16,10 @@ OUTPUT_FOLDER = (
     r"D:\Python Project\Output Letters"
 )
  
-# ─── Cerebras API ────────────────────────────────────────────────────────────
-CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY", "")
-CEREBRAS_MODEL = "qwen-3-235b-a22b-instruct-2507"
+# ─── OpenAI API ──────────────────────────────────────────────────────────────
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.5")
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "")
  
 # ─── Translation settings ───────────────────────────────────────────────────
 # Max retries for API calls
@@ -27,7 +28,7 @@ MAX_RETRIES = 3
 RETRY_DELAY = 2
 
 # ─── Ollama (local open-source LLM) ──────────────────────────────────────────
-# Set OLLAMA_ENABLED=false in .env to force all traffic through Cerebras.
+# Set OLLAMA_ENABLED=false in .env to force all traffic through OpenAI.
 OLLAMA_ENABLED  = os.getenv("OLLAMA_ENABLED",  "true").lower() == "true"
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL",    "gpt-oss:120b-cloud")
@@ -35,10 +36,10 @@ OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL",    "gpt-oss:120b-cloud")
 OLLAMA_TIMEOUT  = int(os.getenv("OLLAMA_TIMEOUT", "120"))
 
 # ─── Routing mode ─────────────────────────────────────────────────────────────
-# "hybrid"        — Ollama for analysis + simple translations; Cerebras for complex
-# "ollama-only"   — Ollama for every task (falls back to Cerebras on failure)
-# "cerebras-only" — Cerebras for every task (original single-model behaviour)
-ROUTING_MODE = os.getenv("ROUTING_MODE", "hybrid")
+# "hybrid"       — Ollama for analysis + simple translations; OpenAI for complex
+# "ollama-only"  — Ollama for every task (falls back to OpenAI on failure)
+# "openai-only"  — OpenAI for every task
+ROUTING_MODE = os.getenv("ROUTING_MODE", "ollama-only")
 
 # ─── Paragraph batching ───────────────────────────────────────────────────────
 # Paragraphs shorter than BATCH_THRESHOLD chars are grouped into batch API calls,

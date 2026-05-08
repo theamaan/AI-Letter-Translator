@@ -3,7 +3,7 @@ LLM Provider Abstraction Layer
 ===============================
 Provides a unified interface for calling different LLM backends:
 
-  - CerebrasProvider : Cerebras Cloud SDK  (premium model — complex tasks / fallback)
+    - OpenAIProvider   : OpenAI Responses API (premium model — complex tasks / fallback)
   - OllamaProvider   : Local Ollama HTTP API (open-source model — standard tasks)
 
 Both providers implement the same ``LLMProvider`` interface so they are
@@ -38,11 +38,11 @@ class LLMProvider(ABC):
         ...
 
 
-# ─── Cerebras Provider ────────────────────────────────────────────────────────
+# ─── OpenAI Provider ─────────────────────────────────────────────────────────
 
-class CerebrasProvider(LLMProvider):
+class OpenAIProvider(LLMProvider):
     """
-    Cerebras Cloud SDK provider.
+    OpenAI Responses API provider.
     Used for complex medical/legal content and as the automatic fallback when
     the local Ollama model is unavailable or returns an empty response.
     """
@@ -54,47 +54,42 @@ class CerebrasProvider(LLMProvider):
 
     def _get_client(self):
         if self._client is None:
-            from cerebras.cloud.sdk import Cerebras  # deferred import
-            if not config.CEREBRAS_API_KEY:
+            from openai import OpenAI  # deferred import
+            if not config.OPENAI_API_KEY:
                 raise RuntimeError(
-                    "CEREBRAS_API_KEY is not set. Add it to your .env file."
+                    "OPENAI_API_KEY is not set. Add it to your .env file."
                 )
-            self._client = Cerebras(api_key=config.CEREBRAS_API_KEY)
+            kwargs = {"api_key": config.OPENAI_API_KEY}
+            if config.OPENAI_BASE_URL:
+                kwargs["base_url"] = config.OPENAI_BASE_URL
+            self._client = OpenAI(**kwargs)
         return self._client
 
     # ── Public ────────────────────────────────────────────────────────────────
 
     @property
     def name(self) -> str:
-        return f"Cerebras({config.CEREBRAS_MODEL})"
+        return f"OpenAI({config.OPENAI_MODEL})"
 
     def call(self, system_prompt: str, user_prompt: str) -> str:
         client = self._get_client()
         for attempt in range(1, config.MAX_RETRIES + 1):
             try:
-                stream = client.chat.completions.create(
-                    model=config.CEREBRAS_MODEL,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                    stream=True,
-                    max_completion_tokens=20_000,
-                    temperature=0.1,
-                    top_p=1,
+                response = client.responses.create(
+                    model=config.OPENAI_MODEL,
+                    instructions=system_prompt,
+                    input=user_prompt,
                 )
-                result = ""
-                for chunk in stream:
-                    result += chunk.choices[0].delta.content or ""
+                result = getattr(response, "output_text", "") or ""
                 return result.strip()
             except Exception as exc:
                 wait = config.RETRY_DELAY ** attempt
                 print(
-                    f"  [Cerebras retry {attempt}/{config.MAX_RETRIES}] "
+                    f"  [OpenAI retry {attempt}/{config.MAX_RETRIES}] "
                     f"{exc}. Waiting {wait}s..."
                 )
                 time.sleep(wait)
-        print("  [Cerebras] All retries exhausted.")
+        print("  [OpenAI] All retries exhausted.")
         return ""
 
 

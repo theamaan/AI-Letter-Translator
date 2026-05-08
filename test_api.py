@@ -1,16 +1,16 @@
-"""Quick test of Cerebras API connectivity."""
+"""Quick test of OpenAI API connectivity."""
 import os
 from dotenv import load_dotenv
 load_dotenv()
 
-api_key = os.getenv("CEREBRAS_API_KEY", "")
+api_key = os.getenv("OPENAI_API_KEY", "")
 print(f"API Key loaded: {'Yes' if api_key else 'No'} ({api_key[:10]}...)")
 
 # Test 1: DNS resolution
 import socket
 try:
-    ip = socket.getaddrinfo("api.cerebras.ai", 443)
-    print(f"DNS resolved: api.cerebras.ai -> {ip[0][4][0]}")
+    ip = socket.getaddrinfo("api.openai.com", 443)
+    print(f"DNS resolved: api.openai.com -> {ip[0][4][0]}")
 except Exception as e:
     print(f"DNS FAILED: {e}")
 
@@ -20,7 +20,7 @@ import ssl
 
 try:
     ctx = ssl.create_default_context()
-    req = urllib.request.Request("https://api.cerebras.ai/v1/models", headers={
+    req = urllib.request.Request("https://api.openai.com/v1/models", headers={
         "Authorization": f"Bearer {api_key}"
     })
     resp = urllib.request.urlopen(req, timeout=10, context=ctx)
@@ -37,11 +37,11 @@ for v in proxy_vars:
     else:
         print(f"  {v} = (not set)")
 
-# Test 4: Try with openai client
-print("\nTesting OpenAI client to Cerebras...")
+# Test 4: Try with OpenAI client
+print("\nTesting OpenAI client...")
 try:
     from openai import OpenAI
-    client = OpenAI(base_url="https://api.cerebras.ai/v1", api_key=api_key)
+    client = OpenAI(api_key=api_key)
     models = client.models.list()
     print(f"Models available: {[m.id for m in models.data]}")
 except Exception as e:

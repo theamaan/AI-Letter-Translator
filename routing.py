@@ -8,25 +8,25 @@ Routing strategy (default: "hybrid")
 -------------------------------------
   analyze          → Ollama  (structured extraction; no premium model needed)
   translate simple → Ollama  (short paragraphs, plain language)
-  translate complex→ Cerebras (medical codes, clinical criteria language)
-  fallback         → Cerebras whenever Ollama is unavailable or returns empty
+    translate complex→ OpenAI (medical codes, clinical criteria language)
+    fallback         → OpenAI whenever Ollama is unavailable or returns empty
 
 Routing modes (set via ROUTING_MODE in config or --provider CLI flag)
 ----------------------------------------------------------------------
-  "hybrid"        — recommended default: Ollama for simple, Cerebras for complex
-  "ollama-only"   — local model for all tasks; falls back to Cerebras on failure
-  "cerebras-only" — Cerebras for everything (preserves original behaviour)
+    "hybrid"      — recommended default: Ollama for simple, OpenAI for complex
+    "ollama-only" — local model for all tasks; falls back to OpenAI on failure
+    "openai-only" — OpenAI for everything
 """
 
 import re
 from typing import Tuple
 
 import config
-from llm_providers import CerebrasProvider, LLMProvider, OllamaProvider
+from llm_providers import LLMProvider, OllamaProvider, OpenAIProvider
 
 
 # ─── Complexity Detection Patterns ───────────────────────────────────────────
-# Patterns that indicate content requiring the premium Cerebras model.
+# Patterns that indicate content requiring the premium OpenAI model.
 
 _COMPLEX_PATTERNS = [
     re.compile(r"\b[A-Z]\d{2,3}\.?\d*\b"),           # ICD-10 codes: M54.5, J45.90
@@ -53,7 +53,7 @@ def _is_complex_content(text: str) -> bool:
 class TranslationRouter:
     """
     Routes each translation task to the most cost-effective LLM provider
-    while maintaining output quality through automatic Cerebras fallback.
+    while maintaining output quality through automatic OpenAI fallback.
 
     Usage::
 
@@ -70,7 +70,7 @@ class TranslationRouter:
     def __init__(self, mode: str | None = None) -> None:
         self._mode = mode or config.ROUTING_MODE
         self._ollama = OllamaProvider()
-        self._cerebras = CerebrasProvider()
+        self._openai = OpenAIProvider()
         self._ollama_ok: bool | None = None  # lazily probed on first call
 
     # ── Public ────────────────────────────────────────────────────────────────
@@ -82,7 +82,7 @@ class TranslationRouter:
         user_prompt: str,
     ) -> Tuple[str, str]:
         """
-        Call the selected provider; automatically fall back to Cerebras if
+        Call the selected provider; automatically fall back to OpenAI if
         Ollama is chosen but returns an empty response.
 
         Args:
@@ -99,11 +99,11 @@ class TranslationRouter:
 
         result = provider.call(system_prompt, user_prompt)
 
-        # Fallback: Ollama was chosen but returned nothing → retry via Cerebras
+        # Fallback: Ollama was chosen but returned nothing → retry via OpenAI
         if not result and isinstance(provider, OllamaProvider):
-            print("  [Router] Ollama returned empty — falling back to Cerebras.")
-            result = self._cerebras.call(system_prompt, user_prompt)
-            label = f"{self._cerebras.name}(fallback)"
+            print("  [Router] Ollama returned empty — falling back to OpenAI.")
+            result = self._openai.call(system_prompt, user_prompt)
+            label = f"{self._openai.name}(fallback)"
 
         return result, label
 
@@ -119,22 +119,22 @@ class TranslationRouter:
                 if not self._ollama_ok:
                     print(
                         f"  [Router] Ollama not reachable at {config.OLLAMA_BASE_URL}"
-                        " — all tasks will use Cerebras."
+                        " — all tasks will use OpenAI."
                     )
         return self._ollama_ok
 
     def _select(self, task_type: str, text: str) -> LLMProvider:
         """Choose the provider for a given task type and content."""
         # Hard overrides first
-        if self._mode == "cerebras-only":
-            return self._cerebras
+        if self._mode == "openai-only":
+            return self._openai
 
         if self._mode == "ollama-only":
-            return self._ollama if self._ollama_available() else self._cerebras
+            return self._ollama if self._ollama_available() else self._openai
 
         # Hybrid routing
         if not self._ollama_available():
-            return self._cerebras
+            return self._openai
 
         # Analysis: Ollama handles structured JSON extraction well
         if task_type == "analyze":
@@ -142,7 +142,7 @@ class TranslationRouter:
 
         # Complex medical/legal content → premium model
         if task_type == "translate" and _is_complex_content(text):
-            return self._cerebras
+            return self._openai
 
         # Default: local model handles standard sentences
         return self._ollama

@@ -4,7 +4,7 @@ AI Letter Translator — Agentic Document Translation Tool
 Reads .docx healthcare letters, translates them using a hybrid LLM strategy:
 
   - Ollama (local open-source model) for document analysis and simple translations
-  - Cerebras API (premium model) for complex medical/legal content and fallback
+    - OpenAI API (premium model) for complex medical/legal content and fallback
 
 Optimisations over the single-model version:
   - Prompt compression   : ~60 % fewer input tokens per translation call
@@ -19,7 +19,7 @@ Usage:
     python translator.py --all                         # Translate all files
     python translator.py --provider hybrid             # Auto-routing (default)
     python translator.py --provider ollama-only        # Force local model only
-    python translator.py --provider cerebras-only      # Force Cerebras only
+    python translator.py --provider openai-only        # Force OpenAI only
     python translator.py --all --skip-existing         # Skip already translated
 
 Author: AI Translator Automation
@@ -56,7 +56,7 @@ from spanish_readability import (
 @dataclass
 class _TranslationStats:
     """Tracks per-document API usage so cost-saving metrics can be reported."""
-    cerebras_calls: int = 0
+    openai_calls: int = 0
     ollama_calls: int   = 0
     fallback_calls: int = 0
     cache_hits: int     = 0
@@ -64,16 +64,16 @@ class _TranslationStats:
 
     @property
     def total_api_calls(self) -> int:
-        return self.cerebras_calls + self.ollama_calls
+        return self.openai_calls + self.ollama_calls
 
     def record(self, label: str) -> None:
         """Increment the appropriate counter from a provider label string."""
         low = label.lower()
         if "fallback" in low:
             self.fallback_calls += 1
-            self.cerebras_calls += 1
-        elif "cerebras" in low:
-            self.cerebras_calls += 1
+            self.openai_calls += 1
+        elif "openai" in low:
+            self.openai_calls += 1
         else:
             self.ollama_calls += 1
 
@@ -85,40 +85,32 @@ class _TranslationStats:
 # working without any modifications.
 
 def get_client():
-    """Return a CerebrasProvider instance (backward-compat shim)."""
-    from llm_providers import CerebrasProvider
-    return CerebrasProvider()
+    """Return an OpenAIProvider instance (backward-compat shim)."""
+    from llm_providers import OpenAIProvider
+    return OpenAIProvider()
 
 
 def call_llm(client, system_prompt: str, user_prompt: str) -> str:
     """
     Call an LLM provider and return the response text.
-    Accepts a LLMProvider instance (new path) or a raw Cerebras SDK client (legacy).
+    Accepts a LLMProvider instance (new path) or a raw OpenAI client (legacy).
     """
     from llm_providers import LLMProvider
     if isinstance(client, LLMProvider):
         return client.call(system_prompt, user_prompt)
-    # Legacy raw Cerebras SDK client
+    # Legacy raw OpenAI client
     for attempt in range(1, config.MAX_RETRIES + 1):
         try:
-            stream = client.chat.completions.create(
-                model=config.CEREBRAS_MODEL,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                stream=True,
-                max_completion_tokens=20_000,
-                temperature=0.1,
-                top_p=1,
+            response = client.responses.create(
+                model=config.OPENAI_MODEL,
+                instructions=system_prompt,
+                input=user_prompt,
             )
-            result = ""
-            for chunk in stream:
-                result += chunk.choices[0].delta.content or ""
+            result = getattr(response, "output_text", "") or ""
             return result.strip()
         except Exception as exc:
             wait = config.RETRY_DELAY ** attempt
-            print(f"  [Retry {attempt}/{config.MAX_RETRIES}] API error: {exc}. Waiting {wait}s...")
+            print(f"  [OpenAI retry {attempt}/{config.MAX_RETRIES}] API error: {exc}. Waiting {wait}s...")
             time.sleep(wait)
     print("  ERROR: All API retries exhausted.")
     return ""
@@ -342,7 +334,7 @@ def _parse_batch_response(response: str, count: int, originals: list) -> list:
 def analyze_document_content(router: TranslationRouter, full_text: str) -> tuple:
     """
     Agent Step 1: Identify elements that must NOT be translated.
-    Routes to Ollama in hybrid mode; falls back to Cerebras automatically.
+    Routes to Ollama in hybrid mode; falls back to OpenAI automatically.
 
     Returns:
         (do_not_translate_list, provider_label)
@@ -644,7 +636,7 @@ def _print_document_stats(
     print(f"{ind}Analysis provider  : {analysis_provider}")
     print(f"{ind}Ollama API calls   : {stats.ollama_calls}")
     print(
-        f"{ind}Cerebras API calls : {stats.cerebras_calls}"
+        f"{ind}OpenAI API calls   : {stats.openai_calls}"
         + (f" ({stats.fallback_calls} fallback)" if stats.fallback_calls else "")
     )
     print(f"{ind}Batched calls      : {stats.batched_calls}")
@@ -796,13 +788,13 @@ def main():
     )
     parser.add_argument(
         "--provider",
-        choices=["hybrid", "ollama-only", "cerebras-only"],
+        choices=["hybrid", "ollama-only", "openai-only"],
         default=None,
         help=(
             "LLM routing strategy. "
-            "'hybrid' (default): Ollama for simple tasks, Cerebras for complex. "
+            "'hybrid' (default): Ollama for simple tasks, OpenAI for complex. "
             "'ollama-only': local model for everything. "
-            "'cerebras-only': Cerebras for everything (original behaviour)."
+            "'openai-only': OpenAI for everything."
         ),
     )
     parser.add_argument(

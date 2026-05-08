@@ -1,9 +1,9 @@
-"""Test Cerebras API with Windows system cert store (for corporate SSL inspection)."""
+"""Test OpenAI API with Windows system cert store (for corporate SSL inspection)."""
 import os
 from dotenv import load_dotenv
 load_dotenv()
 
-api_key = os.getenv("CEREBRAS_API_KEY", "")
+api_key = os.getenv("OPENAI_API_KEY", "")
 
 # Method 1: Try truststore (uses Windows cert store)
 print("--- Method 1: truststore ---")
@@ -13,9 +13,9 @@ try:
     print("truststore injected successfully")
     
     from openai import OpenAI
-    client = OpenAI(base_url="https://api.cerebras.ai/v1", api_key=api_key)
+    client = OpenAI(api_key=api_key)
     resp = client.chat.completions.create(
-        model="llama3.1-8b",
+        model="gpt-4o-mini",
         messages=[{"role": "user", "content": "Say hello in Spanish"}],
         max_tokens=20,
     )
@@ -30,12 +30,11 @@ try:
     http_client = httpx.Client(verify=False)
     from openai import OpenAI
     client = OpenAI(
-        base_url="https://api.cerebras.ai/v1",
         api_key=api_key,
         http_client=http_client,
     )
     resp = client.chat.completions.create(
-        model="llama3.1-8b",
+        model="gpt-4o-mini",
         messages=[{"role": "user", "content": "Say hello in Spanish"}],
         max_tokens=20,
     )
