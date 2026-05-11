@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Letter Translator</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="logo-mark" aria-hidden="true">
+        <svg width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="34" height="34" rx="9" fill="#1a56db"/>
+          <path d="M9 12h9M9 17h7M9 22h5" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M20 14l4 4-4 4M24 18h-8" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="site-title">AI Letter Translator</h1>
+        <p class="site-subtitle">Healthcare document translation powered by AI</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <div class="card">
+
+      <form id="translateForm" novalidate>
+
+        <!-- ── File Upload ──────────────────────────────────────────── -->
+        <div class="field">
+          <label class="field-label" for="fileInput">
+            Document <span class="required">*</span>
+          </label>
+          <div
+            class="file-drop"
+            id="fileDrop"
+            role="button"
+            tabindex="0"
+            aria-label="Click or drag a .docx file here to upload"
+          >
+            <div class="file-drop-icon" aria-hidden="true">
+              <svg width="38" height="38" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 15V4M12 4l-3.5 3.5M12 4l3.5 3.5" stroke="#9ca3af" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke="#9ca3af" stroke-width="1.6" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <p id="fileNameDisplay" class="file-drop-text">
+              Drop a .docx file here, or <strong>click to browse</strong>
+            </p>
+            <p class="file-drop-hint">Microsoft Word (.docx) only · Max {{ max_mb }} MB</p>
+          </div>
+          <input
+            type="file"
+            id="fileInput"
+            name="file"
+            accept=".docx"
+            class="file-input-hidden"
+            required
+            aria-hidden="true"
+            tabindex="-1"
+          />
+        </div>
+
+        <!-- ── Language + Provider ─────────────────────────────────── -->
+        <div class="field-row">
+          <div class="field field-no-margin">
+            <label class="field-label" for="languageSelect">
+              Target Language <span class="required">*</span>
+            </label>
+            <div class="select-wrap">
+              <select id="languageSelect" name="language" class="select" required>
+                {% for code, name in languages.items() %}
+                <option value="{{ code }}">{{ name }}</option>
+                {% endfor %}
+              </select>
+              <span class="select-arrow" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M6 9l6 6 6-6"/>
+                </svg>
+              </span>
+            </div>
+          </div>
+
+          <div class="field field-no-margin">
+            <label class="field-label" for="providerSelect">LLM Provider</label>
+            <div class="select-wrap">
+              <select id="providerSelect" name="provider" class="select">
+                {% for code, name in providers.items() %}
+                <option value="{{ code }}" {% if code == 'hybrid' %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+              </select>
+              <span class="select-arrow" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M6 9l6 6 6-6"/>
+                </svg>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Submit ──────────────────────────────────────────────── -->
+        <button type="submit" id="submitBtn" class="btn-primary">
+          <span id="btnText">Translate</span>
+          <span id="btnSpinner" class="btn-spinner hidden" aria-hidden="true"></span>
+        </button>
+
+      </form>
+
+      <!-- ── Success banner ──────────────────────────────────────────── -->
+      <div id="resultBanner" class="banner banner-success hidden" role="status" aria-live="polite">
+        <div class="banner-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="10" cy="10" r="9" stroke="#16a34a" stroke-width="1.5"/>
+            <path d="M5.5 10.5l3 3 6-6" stroke="#16a34a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="banner-body">
+          <p class="banner-title">Translation complete</p>
+          <p id="resultFilename" class="banner-sub"></p>
+        </div>
+        <a id="downloadBtn" class="btn-download" href="#" download>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 4v12M8 12l4 4 4-4M4 18h16"/>
+          </svg>
+          Download
+        </a>
+      </div>
+
+      <!-- ── Error banner ────────────────────────────────────────────── -->
+      <div id="errorBanner" class="banner banner-error hidden" role="alert" aria-live="assertive">
+        <div class="banner-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="10" cy="10" r="9" stroke="#dc2626" stroke-width="1.5"/>
+            <path d="M10 6v5" stroke="#dc2626" stroke-width="1.8" stroke-linecap="round"/>
+            <circle cx="10" cy="14" r="0.8" fill="#dc2626"/>
+          </svg>
+        </div>
+        <div class="banner-body">
+          <p class="banner-title">Translation failed</p>
+          <p id="errorMsg" class="banner-sub error-detail"></p>
+        </div>
+      </div>
+
+    </div><!-- /.card -->
+  </main>
+
+  <script>
+    const form             = document.getElementById('translateForm');
+    const fileInput        = document.getElementById('fileInput');
+    const fileDrop         = document.getElementById('fileDrop');
+    const fileNameDisplay  = document.getElementById('fileNameDisplay');
+    const submitBtn        = document.getElementById('submitBtn');
+    const btnText          = document.getElementById('btnText');
+    const btnSpinner       = document.getElementById('btnSpinner');
+    const resultBanner     = document.getElementById('resultBanner');
+    const resultFilename   = document.getElementById('resultFilename');
+    const downloadBtn      = document.getElementById('downloadBtn');
+    const errorBanner      = document.getElementById('errorBanner');
+    const errorMsg         = document.getElementById('errorMsg');
+
+    // ── File drop zone ──────────────────────────────────────────────────────
+    fileDrop.addEventListener('click', () => fileInput.click());
+    fileDrop.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        fileInput.click();
+      }
+    });
+
+    fileDrop.addEventListener('dragenter', (e) => e.preventDefault());
+    fileDrop.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      fileDrop.classList.add('drag-over');
+    });
+    fileDrop.addEventListener('dragleave', (e) => {
+      if (!fileDrop.contains(e.relatedTarget)) {
+        fileDrop.classList.remove('drag-over');
+      }
+    });
+    fileDrop.addEventListener('drop', (e) => {
+      e.preventDefault();
+      fileDrop.classList.remove('drag-over');
+      if (e.dataTransfer.files.length > 0) {
+        const transfer = new DataTransfer();
+        transfer.items.add(e.dataTransfer.files[0]);
+        fileInput.files = transfer.files;
+        updateFileDisplay();
+      }
+    });
+
+    fileInput.addEventListener('change', updateFileDisplay);
+
+    function updateFileDisplay() {
+      if (fileInput.files.length > 0) {
+        fileNameDisplay.textContent = fileInput.files[0].name;
+        fileNameDisplay.classList.add('has-file');
+        fileDrop.classList.add('has-file');
+      } else {
+        fileNameDisplay.innerHTML = 'Drop a .docx file here, or <strong>click to browse</strong>';
+        fileNameDisplay.classList.remove('has-file');
+        fileDrop.classList.remove('has-file');
+      }
+    }
+
+    // ── UI state helpers ────────────────────────────────────────────────────
+    function setLoading(on) {
+      submitBtn.disabled = on;
+      btnText.textContent = on ? 'Translating\u2026' : 'Translate';
+      btnSpinner.classList.toggle('hidden', !on);
+      Array.from(form.elements).forEach(el => { el.disabled = on; });
+    }
+
+    function hideBanners() {
+      resultBanner.classList.add('hidden');
+      errorBanner.classList.add('hidden');
+    }
+
+    function showResult(filename) {
+      resultFilename.textContent = filename;
+      downloadBtn.href = '/download/' + encodeURIComponent(filename);
+      downloadBtn.setAttribute('download', filename);
+      resultBanner.classList.remove('hidden');
+      errorBanner.classList.add('hidden');
+      resultBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function showError(msg) {
+      errorMsg.textContent = msg;
+      errorBanner.classList.remove('hidden');
+      resultBanner.classList.add('hidden');
+      errorBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // ── Form submission ─────────────────────────────────────────────────────
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideBanners();
+
+      if (!fileInput.files.length) {
+        showError('Please select a .docx file to upload.');
+        return;
+      }
+      if (!fileInput.files[0].name.toLowerCase().endsWith('.docx')) {
+        showError('Only .docx files are supported.');
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        const response = await fetch('/translate', {
+          method: 'POST',
+          body: new FormData(form),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status}`);
+        }
+
+        const json = await response.json();
+        if (json.success) {
+          showResult(json.filename);
+        } else {
+          showError(json.error || 'An unknown error occurred.');
+        }
+      } catch (err) {
+        showError('Network error — could not reach the server. Is it running?');
+      } finally {
+        setLoading(false);
+      }
+    });
+  </script>
+
+</body>
+</html>
