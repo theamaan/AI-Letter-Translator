@@ -248,12 +248,15 @@
         return;
       }
 
+      // Capture FormData BEFORE disabling form elements —
+      // disabled inputs are excluded from FormData.
+      const formData = new FormData(form);
       setLoading(true);
 
       try {
         const response = await fetch('/translate', {
           method: 'POST',
-          body: new FormData(form),
+          body: formData,
         });
 
         if (!response.ok) {
