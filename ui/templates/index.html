@@ -154,6 +154,19 @@
 
       </form>
 
+      <!-- ── Live translation log ─────────────────────────────────────────── -->
+      <div id="logPanel" class="log-panel hidden">
+        <div class="log-header">
+          <div class="log-status-row">
+            <span class="log-dot" id="logDot"></span>
+            <span id="logStatusMsg" class="log-status-text">Starting…</span>
+          </div>
+          <span id="elapsedTimer" class="log-timer">0:00</span>
+        </div>
+        <div id="logBody" class="log-body" aria-live="polite" aria-label="Translation progress"></div>
+        <div id="logFact" class="log-fact"></div>
+      </div>
+
       <!-- ── Success banner ──────────────────────────────────────────── -->
       <div id="resultBanner" class="banner banner-success hidden" role="status" aria-live="polite">
         <div class="banner-icon" aria-hidden="true">
@@ -193,44 +206,41 @@
   </main>
 
   <script>
-    const form             = document.getElementById('translateForm');
-    const fileInput        = document.getElementById('fileInput');
-    const fileDrop         = document.getElementById('fileDrop');
-    const fileNameDisplay  = document.getElementById('fileNameDisplay');
-    const submitBtn        = document.getElementById('submitBtn');
-    const btnText          = document.getElementById('btnText');
-    const btnSpinner       = document.getElementById('btnSpinner');
-    const resultBanner     = document.getElementById('resultBanner');
-    const resultFilename   = document.getElementById('resultFilename');
-    const downloadBtn      = document.getElementById('downloadBtn');
-    const errorBanner      = document.getElementById('errorBanner');
-    const errorMsg         = document.getElementById('errorMsg');
-    const languageSelect   = document.getElementById('languageSelect');
-    const gradePanel       = document.getElementById('spanishGradePanel');
-    const gradeInput       = document.getElementById('spanishGradeInput');
-    const gradeCards       = document.querySelectorAll('.grade-card');
+    const form           = document.getElementById('translateForm');
+    const fileInput      = document.getElementById('fileInput');
+    const fileDrop       = document.getElementById('fileDrop');
+    const fileNameDisp   = document.getElementById('fileNameDisplay');
+    const submitBtn      = document.getElementById('submitBtn');
+    const btnText        = document.getElementById('btnText');
+    const btnSpinner     = document.getElementById('btnSpinner');
+    const resultBanner   = document.getElementById('resultBanner');
+    const resultFilename = document.getElementById('resultFilename');
+    const downloadBtn    = document.getElementById('downloadBtn');
+    const errorBanner    = document.getElementById('errorBanner');
+    const errorMsg       = document.getElementById('errorMsg');
+    const languageSelect = document.getElementById('languageSelect');
+    const gradePanel     = document.getElementById('spanishGradePanel');
+    const gradeInput     = document.getElementById('spanishGradeInput');
+    const gradeCards     = document.querySelectorAll('.grade-card');
+    const logPanel       = document.getElementById('logPanel');
+    const logDot         = document.getElementById('logDot');
+    const logStatusMsg   = document.getElementById('logStatusMsg');
+    const elapsedTimer   = document.getElementById('elapsedTimer');
+    const logBody        = document.getElementById('logBody');
+    const logFact        = document.getElementById('logFact');
 
     // ── Spanish grade panel ─────────────────────────────────────────────────
     function updateGradePanel() {
       const isSpanish = languageSelect.value === 'es';
-      if (isSpanish) {
-        gradePanel.classList.remove('grade-panel-hidden');
-        gradePanel.classList.add('grade-panel-visible');
-      } else {
-        gradePanel.classList.remove('grade-panel-visible');
-        gradePanel.classList.add('grade-panel-hidden');
-      }
+      gradePanel.classList.toggle('grade-panel-hidden', !isSpanish);
+      gradePanel.classList.toggle('grade-panel-visible', isSpanish);
     }
-
     languageSelect.addEventListener('change', updateGradePanel);
-    updateGradePanel(); // run on load in case Spanish is pre-selected
+    updateGradePanel();
 
     gradeCards.forEach(card => {
       card.addEventListener('click', () => {
-        gradeCards.forEach(c => {
-          c.classList.remove('grade-card-selected');
-          c.setAttribute('aria-pressed', 'false');
-        });
+        gradeCards.forEach(c => { c.classList.remove('grade-card-selected'); c.setAttribute('aria-pressed', 'false'); });
         card.classList.add('grade-card-selected');
         card.setAttribute('aria-pressed', 'true');
         gradeInput.value = card.dataset.grade;
@@ -240,51 +250,175 @@
     // ── File drop zone ──────────────────────────────────────────────────────
     fileDrop.addEventListener('click', () => fileInput.click());
     fileDrop.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        fileInput.click();
-      }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
     });
-
     fileDrop.addEventListener('dragenter', (e) => e.preventDefault());
-    fileDrop.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      fileDrop.classList.add('drag-over');
-    });
-    fileDrop.addEventListener('dragleave', (e) => {
-      if (!fileDrop.contains(e.relatedTarget)) {
-        fileDrop.classList.remove('drag-over');
-      }
-    });
+    fileDrop.addEventListener('dragover',  (e) => { e.preventDefault(); fileDrop.classList.add('drag-over'); });
+    fileDrop.addEventListener('dragleave', (e) => { if (!fileDrop.contains(e.relatedTarget)) fileDrop.classList.remove('drag-over'); });
     fileDrop.addEventListener('drop', (e) => {
       e.preventDefault();
       fileDrop.classList.remove('drag-over');
       if (e.dataTransfer.files.length > 0) {
-        const transfer = new DataTransfer();
-        transfer.items.add(e.dataTransfer.files[0]);
-        fileInput.files = transfer.files;
+        const dt = new DataTransfer();
+        dt.items.add(e.dataTransfer.files[0]);
+        fileInput.files = dt.files;
         updateFileDisplay();
       }
     });
-
     fileInput.addEventListener('change', updateFileDisplay);
 
     function updateFileDisplay() {
       if (fileInput.files.length > 0) {
-        fileNameDisplay.textContent = fileInput.files[0].name;
-        fileNameDisplay.classList.add('has-file');
+        fileNameDisp.textContent = fileInput.files[0].name;
+        fileNameDisp.classList.add('has-file');
         fileDrop.classList.add('has-file');
       } else {
-        fileNameDisplay.innerHTML = 'Drop a .docx file here, or <strong>click to browse</strong>';
-        fileNameDisplay.classList.remove('has-file');
+        fileNameDisp.innerHTML = 'Drop a .docx file here, or <strong>click to browse</strong>';
+        fileNameDisp.classList.remove('has-file');
         fileDrop.classList.remove('has-file');
       }
+    }
+
+    // ── Live log — data ─────────────────────────────────────────────────────
+    const STATUS_MESSAGES = [
+      'Analyzing document structure…',
+      'Identifying medical terminology…',
+      'Building do-not-translate list…',
+      'Routing to AI provider…',
+      'Translating paragraph blocks…',
+      'Batching short segments…',
+      'Checking phrase cache…',
+      'Applying healthcare terminology…',
+      'Preserving fonts and formatting…',
+      'Optimizing token usage…',
+      'Running readability checks…',
+      'Finalizing output document…',
+      'Almost there…',
+    ];
+
+    const LANG_FACTS = {
+      es: [
+        'Spanish is the 2nd most-spoken native language — over 500 million speakers worldwide.',
+        'The word "ojalá" (hopefully) comes from Arabic: inshallah.',
+        'Spanish has two forms of "you" — tú (informal) and usted (formal).',
+        'Spanish is an official language in 21 countries across 4 continents.',
+        'The Real Academia Española has standardized Spanish grammar since 1713.',
+      ],
+      zh: [
+        'Mandarin Chinese has 4 tones — the same syllable can mean completely different things.',
+        'There are ~50,000 Chinese characters, but just 2,500 cover everyday literacy.',
+        'Chinese has no verb conjugation — tense is expressed through time words.',
+        'Written Chinese has been in continuous use for over 3,000 years.',
+      ],
+      vi: [
+        'Vietnamese uses a Latin alphabet with diacritics, adopted in the 17th century.',
+        'Vietnamese is a tonal language with 6 tones in the northern dialect.',
+        'Over 90 million people speak Vietnamese as their native language.',
+      ],
+      ko: [
+        'The Korean alphabet Hangul was invented in 1443 by King Sejong the Great.',
+        'Korean sentence structure is Subject–Object–Verb, unlike English.',
+        'Korean has an extensive honorific system based on social relationships.',
+      ],
+      ar: [
+        'Arabic is written right-to-left and is spoken by over 310 million people.',
+        'Arabic has contributed thousands of words to English, including algebra and alcohol.',
+        'Classical Arabic is the language of the Quran, unchanged for over 1,400 years.',
+      ],
+      fr: [
+        'French is an official language in 29 countries across 5 continents.',
+        'About 45% of modern English vocabulary comes from French.',
+        'French was the language of international diplomacy for over three centuries.',
+      ],
+      de: [
+        'German is the most widely spoken native language in the European Union.',
+        'German compound words can be arbitrarily long — Donaudampfschifffahrt is a real one.',
+        'German has three grammatical genders and four cases.',
+      ],
+      pt: [
+        'Portuguese is spoken by over 250 million people on 5 continents.',
+        'Brazil has more Portuguese speakers than Portugal by a factor of 20.',
+        'Portuguese and Spanish share about 89% lexical similarity.',
+      ],
+      ja: [
+        'Japanese uses three writing systems simultaneously: Hiragana, Katakana, and Kanji.',
+        'There are over 2,000 Kanji characters in everyday Japanese use.',
+        'Japanese has distinct speech levels for different social situations.',
+      ],
+      default: [
+        'Over 7,000 languages are spoken around the world today.',
+        'Translation accuracy in healthcare can directly impact patient outcomes.',
+        'The UN recognizes 6 official languages: Arabic, Chinese, English, French, Russian, and Spanish.',
+        'AI translation models are trained on billions of multilingual document pairs.',
+        'Healthcare interpreting is one of the most specialized forms of translation.',
+        'Molina Healthcare serves members across 18 U.S. states.',
+      ],
+    };
+
+    // ── Live log — helpers ──────────────────────────────────────────────────
+    let _timer = null, _statusTimer = null, _factTimer = null;
+
+    function startLiveUI(langCode) {
+      logPanel.classList.remove('hidden');
+      logBody.innerHTML = '';
+      logDot.className = 'log-dot log-dot-pulse';
+      elapsedTimer.textContent = '0:00';
+
+      const t0 = Date.now();
+      _timer = setInterval(() => {
+        const s = Math.floor((Date.now() - t0) / 1000);
+        elapsedTimer.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+      }, 1000);
+
+      let si = 0;
+      logStatusMsg.textContent = STATUS_MESSAGES[0];
+      _statusTimer = setInterval(() => {
+        si = (si + 1) % STATUS_MESSAGES.length;
+        logStatusMsg.textContent = STATUS_MESSAGES[si];
+      }, 3500);
+
+      const facts = LANG_FACTS[langCode] || LANG_FACTS.default;
+      let fi = 0;
+      logFact.textContent = '💡 ' + facts[0];
+      logFact.style.opacity = '1';
+      _factTimer = setInterval(() => {
+        fi = (fi + 1) % facts.length;
+        logFact.style.opacity = '0';
+        setTimeout(() => { logFact.textContent = '💡 ' + facts[fi]; logFact.style.opacity = '1'; }, 350);
+      }, 5500);
+
+      logPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function stopLiveUI() {
+      clearInterval(_timer); clearInterval(_statusTimer); clearInterval(_factTimer);
+      logDot.className = 'log-dot log-dot-done';
+      logStatusMsg.textContent = 'Done';
+    }
+
+    function appendLog(line) {
+      const el = document.createElement('div');
+      el.className = 'log-line ' + classifyLine(line);
+      el.textContent = line;
+      logBody.appendChild(el);
+      while (logBody.children.length > 200) logBody.removeChild(logBody.firstChild);
+      logBody.scrollTop = logBody.scrollHeight;
+    }
+
+    function classifyLine(line) {
+      const l = line.toLowerCase();
+      if (l.startsWith('error') || l.includes('exception') || l.includes('traceback')) return 'log-error';
+      if (l.includes('translating') || (l.includes('para') && l.includes('/')))        return 'log-progress';
+      if (l.includes('saving') || l.includes('complete') || l.includes('%') || l.includes('cache hit')) return 'log-success';
+      if (l.includes('ollama') || l.includes('openai') || l.includes('routing') || l.includes('llm'))   return 'log-provider';
+      if (l.startsWith('===') || l.startsWith('---'))                                   return 'log-sep';
+      return '';
     }
 
     // ── UI state helpers ────────────────────────────────────────────────────
     function setLoading(on) {
       submitBtn.disabled = on;
-      btnText.textContent = on ? 'Translating\u2026' : 'Translate';
+      btnText.textContent = on ? 'Translating…' : 'Translate';
       btnSpinner.classList.toggle('hidden', !on);
       Array.from(form.elements).forEach(el => { el.disabled = on; });
     }
@@ -310,42 +444,59 @@
       errorBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
-    // ── Form submission ─────────────────────────────────────────────────────
+    // ── Form submission (SSE streaming) ─────────────────────────────────────
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       hideBanners();
 
-      if (!fileInput.files.length) {
-        showError('Please select a .docx file to upload.');
-        return;
-      }
-      if (!fileInput.files[0].name.toLowerCase().endsWith('.docx')) {
-        showError('Only .docx files are supported.');
-        return;
-      }
+      if (!fileInput.files.length) { showError('Please select a .docx file to upload.'); return; }
+      if (!fileInput.files[0].name.toLowerCase().endsWith('.docx')) { showError('Only .docx files are supported.'); return; }
 
-      // Capture FormData BEFORE disabling form elements —
-      // disabled inputs are excluded from FormData.
+      // Capture FormData BEFORE setLoading disables inputs.
       const formData = new FormData(form);
+      const langCode = formData.get('language');
+
       setLoading(true);
+      startLiveUI(langCode);
 
       try {
-        const response = await fetch('/translate', {
-          method: 'POST',
-          body: formData,
-        });
+        const response = await fetch('/translate', { method: 'POST', body: formData });
+        if (!response.ok) { throw new Error(`Server error: ${response.status}`); }
 
-        if (!response.ok) {
-          throw new Error(`Server error: ${response.status}`);
+        // Validation errors come back as JSON before streaming starts
+        const ct = response.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+          const json = await response.json();
+          stopLiveUI();
+          json.success ? showResult(json.filename) : showError(json.error || 'Unknown error.');
+          return;
         }
 
-        const json = await response.json();
-        if (json.success) {
-          showResult(json.filename);
-        } else {
-          showError(json.error || 'An unknown error occurred.');
+        // Read SSE stream line by line
+        const reader  = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop();
+          for (const ln of lines) {
+            if (!ln.startsWith('data: ')) continue;
+            let data;
+            try { data = JSON.parse(ln.slice(6)); } catch { continue; }
+            if (data.done) {
+              stopLiveUI();
+              data.success ? showResult(data.filename) : showError(data.error || 'Translation failed.');
+            } else if (data.line) {
+              appendLog(data.line);
+            }
+          }
         }
       } catch (err) {
+        stopLiveUI();
         showError('Network error — could not reach the server. Is it running?');
       } finally {
         setLoading(false);

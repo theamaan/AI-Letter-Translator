@@ -9,9 +9,10 @@ No imports from the core project — fully self-contained.
 import os
 import sys
 import subprocess
+import json
 from pathlib import Path
 
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, Response, stream_with_context
 from werkzeug.utils import secure_filename
 
 # ---------------------------------------------------------------------------
@@ -108,49 +109,54 @@ def translate():
     source_path = SOURCE_FOLDER / target_filename
     uploaded.save(str(source_path))
 
-    # ── Run the core translator as a subprocess ─────────────────────────────
+    # ── Build command ───────────────────────────────────────────────────────
     cmd = [
         sys.executable,
         str(CORE_SCRIPT),
         "--file", target_filename,
         "--provider", provider,
     ]
-    # Append Spanish readability grade when the target language is Spanish
     if lang_code == "es" and spanish_grade:
         cmd += ["--spanish-grade", spanish_grade]
 
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=TRANSLATION_TIMEOUT,
-        )
-    except subprocess.TimeoutExpired:
+    # ── Stream stdout line-by-line via Server-Sent Events ───────────────────
+    def generate():
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+            for raw in proc.stdout:
+                line = raw.rstrip()
+                if line:
+                    yield f"data: {json.dumps({'line': line})}\n\n"
+            proc.wait()
+        except Exception as exc:
+            source_path.unlink(missing_ok=True)
+            yield f"data: {json.dumps({'done': True, 'success': False, 'error': str(exc)})}\n\n"
+            return
+
         source_path.unlink(missing_ok=True)
-        return jsonify(
-            success=False,
-            error="Translation timed out. The document may be too large.",
-        )
-    except Exception as exc:
-        source_path.unlink(missing_ok=True)
-        return jsonify(success=False, error=f"Failed to start translator: {exc}")
 
-    # Clean up the source file now that translation has finished
-    source_path.unlink(missing_ok=True)
+        if proc.returncode != 0:
+            yield f"data: {json.dumps({'done': True, 'success': False, 'error': 'Translator exited with an error. See the log above for details.'})}\n\n"
+            return
 
-    if result.returncode != 0:
-        error_text = (result.stderr or result.stdout or "Unknown error").strip()
-        return jsonify(success=False, error=error_text[-500:])
+        output_path = OUTPUT_FOLDER / target_filename
+        if not output_path.exists():
+            yield f"data: {json.dumps({'done': True, 'success': False, 'error': 'Translation completed but the output file was not found.'})}\n\n"
+            return
 
-    output_path = OUTPUT_FOLDER / target_filename
-    if not output_path.exists():
-        return jsonify(
-            success=False,
-            error="Translation completed but the output file was not found.",
-        )
+        yield f"data: {json.dumps({'done': True, 'success': True, 'filename': target_filename})}\n\n"
 
-    return jsonify(success=True, filename=target_filename)
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.route("/download/<filename>")
