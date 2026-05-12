@@ -83,8 +83,9 @@ def translate():
         return jsonify(success=False, error="Only .docx files are supported.")
 
     # ── Validate form fields ────────────────────────────────────────────────
-    lang_code = request.form.get("language", "").strip()
-    provider  = request.form.get("provider", "hybrid").strip()
+    lang_code     = request.form.get("language", "").strip()
+    provider      = request.form.get("provider", "hybrid").strip()
+    spanish_grade = request.form.get("spanish_grade", "").strip()
 
     if lang_code not in LANGUAGE_CODES:
         return jsonify(success=False, error="Invalid language selected.")
@@ -108,14 +109,19 @@ def translate():
     uploaded.save(str(source_path))
 
     # ── Run the core translator as a subprocess ─────────────────────────────
+    cmd = [
+        sys.executable,
+        str(CORE_SCRIPT),
+        "--file", target_filename,
+        "--provider", provider,
+    ]
+    # Append Spanish readability grade when the target language is Spanish
+    if lang_code == "es" and spanish_grade:
+        cmd += ["--spanish-grade", spanish_grade]
+
     try:
         result = subprocess.run(
-            [
-                sys.executable,
-                str(CORE_SCRIPT),
-                "--file", target_filename,
-                "--provider", provider,
-            ],
+            cmd,
             capture_output=True,
             text=True,
             timeout=TRANSLATION_TIMEOUT,

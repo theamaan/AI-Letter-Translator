@@ -357,6 +357,134 @@ body {
   outline-offset: 2px;
 }
 
+/* ── Spanish grade panel ─────────────────────────────────────────────────── */
+.grade-panel {
+  overflow: hidden;
+  transition: max-height 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.28s ease,
+              margin-bottom 0.28s ease;
+}
+
+.grade-panel-hidden {
+  max-height: 0;
+  opacity: 0;
+  margin-bottom: 0;
+  pointer-events: none;
+}
+
+.grade-panel-visible {
+  max-height: 340px;
+  opacity: 1;
+  margin-bottom: 22px;
+  pointer-events: auto;
+}
+
+.grade-panel-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.grade-flag {
+  font-size: 22px;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+
+.grade-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.grade-panel-sub {
+  font-size: 12px;
+  color: var(--gray-500);
+  margin-top: 2px;
+}
+
+/* Grade card grid */
+.grade-cards {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.grade-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 12px 8px 10px;
+  background: white;
+  border: 1.5px solid var(--gray-200);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s, background-color 0.15s, transform 0.1s, box-shadow 0.15s;
+  font-family: inherit;
+  position: relative;
+}
+
+.grade-card:hover {
+  border-color: var(--blue-600);
+  background-color: var(--blue-50);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(26, 86, 219, 0.12);
+}
+
+.grade-card:focus-visible {
+  outline: 2px solid var(--blue-600);
+  outline-offset: 2px;
+}
+
+.grade-card-selected {
+  border-color: var(--blue-600);
+  background-color: var(--blue-50);
+  box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.12);
+}
+
+.grade-card-selected::after {
+  content: "";
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
+  background: var(--blue-600);
+  border-radius: 50%;
+}
+
+.grade-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 20px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+/* Colour-coded by difficulty */
+.grade-badge-ve     { background: #d1fae5; color: #065f46; }   /* very easy — teal   */
+.grade-badge-easy   { background: #dcfce7; color: #166534; }   /* easy — green        */
+.grade-badge-normal { background: #dbeafe; color: #1e429f; }   /* normal — blue       */
+.grade-badge-mod    { background: #fef3c7; color: #92400e; }   /* moderate — amber    */
+.grade-badge-diff   { background: #fee2e2; color: #991b1b; }   /* difficult — red     */
+
+.grade-card-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.grade-card-desc {
+  font-size: 10.5px;
+  color: var(--gray-500);
+  line-height: 1.35;
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 540px) {
   .card {
@@ -370,6 +498,14 @@ body {
 
   .field-row .field {
     margin-bottom: 22px;
+  }
+
+  .grade-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .grade-panel-visible {
+    max-height: 500px;
   }
 
   .banner {

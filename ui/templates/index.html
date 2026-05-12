@@ -101,6 +101,51 @@
           </div>
         </div>
 
+        <!-- ── Spanish Readability Grade ───────────────────────────── -->
+        <div id="spanishGradePanel" class="grade-panel grade-panel-hidden">
+          <div class="grade-panel-header">
+            <span class="grade-flag" aria-hidden="true">🇪🇸</span>
+            <div>
+              <p class="grade-panel-title">Readability Target</p>
+              <p class="grade-panel-sub">Select how simple or advanced the Spanish translation should read</p>
+            </div>
+          </div>
+          <div class="grade-cards" role="radiogroup" aria-label="Spanish readability grade">
+
+            <button type="button" class="grade-card" data-grade="very easy" aria-pressed="false">
+              <span class="grade-badge grade-badge-ve">Grade ≤5</span>
+              <span class="grade-card-name">Very Easy</span>
+              <span class="grade-card-desc">Elementary school — simple everyday words</span>
+            </button>
+
+            <button type="button" class="grade-card" data-grade="easy" aria-pressed="false">
+              <span class="grade-badge grade-badge-easy">Grade 6–7</span>
+              <span class="grade-card-name">Easy</span>
+              <span class="grade-card-desc">Middle school — clear and accessible</span>
+            </button>
+
+            <button type="button" class="grade-card grade-card-selected" data-grade="normal" aria-pressed="true">
+              <span class="grade-badge grade-badge-normal">Grade 8–9</span>
+              <span class="grade-card-name">Normal</span>
+              <span class="grade-card-desc">Standard health letter — recommended</span>
+            </button>
+
+            <button type="button" class="grade-card" data-grade="moderate" aria-pressed="false">
+              <span class="grade-badge grade-badge-mod">Grade 10–12</span>
+              <span class="grade-card-name">Moderate</span>
+              <span class="grade-card-desc">Advanced vocabulary and structure</span>
+            </button>
+
+            <button type="button" class="grade-card" data-grade="difficult" aria-pressed="false">
+              <span class="grade-badge grade-badge-diff">College+</span>
+              <span class="grade-card-name">Difficult</span>
+              <span class="grade-card-desc">Clinical / legal precision language</span>
+            </button>
+
+          </div>
+          <input type="hidden" name="spanish_grade" id="spanishGradeInput" value="normal" />
+        </div>
+
         <!-- ── Submit ──────────────────────────────────────────────── -->
         <button type="submit" id="submitBtn" class="btn-primary">
           <span id="btnText">Translate</span>
@@ -160,6 +205,37 @@
     const downloadBtn      = document.getElementById('downloadBtn');
     const errorBanner      = document.getElementById('errorBanner');
     const errorMsg         = document.getElementById('errorMsg');
+    const languageSelect   = document.getElementById('languageSelect');
+    const gradePanel       = document.getElementById('spanishGradePanel');
+    const gradeInput       = document.getElementById('spanishGradeInput');
+    const gradeCards       = document.querySelectorAll('.grade-card');
+
+    // ── Spanish grade panel ─────────────────────────────────────────────────
+    function updateGradePanel() {
+      const isSpanish = languageSelect.value === 'es';
+      if (isSpanish) {
+        gradePanel.classList.remove('grade-panel-hidden');
+        gradePanel.classList.add('grade-panel-visible');
+      } else {
+        gradePanel.classList.remove('grade-panel-visible');
+        gradePanel.classList.add('grade-panel-hidden');
+      }
+    }
+
+    languageSelect.addEventListener('change', updateGradePanel);
+    updateGradePanel(); // run on load in case Spanish is pre-selected
+
+    gradeCards.forEach(card => {
+      card.addEventListener('click', () => {
+        gradeCards.forEach(c => {
+          c.classList.remove('grade-card-selected');
+          c.setAttribute('aria-pressed', 'false');
+        });
+        card.classList.add('grade-card-selected');
+        card.setAttribute('aria-pressed', 'true');
+        gradeInput.value = card.dataset.grade;
+      });
+    });
 
     // ── File drop zone ──────────────────────────────────────────────────────
     fileDrop.addEventListener('click', () => fileInput.click());
